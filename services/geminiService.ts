@@ -1,0 +1,217 @@
+import { GoogleGenAI, Type } from "@google/genai";
+
+const getAI = () => {
+  // 1. Intentar obtener de Vercel (import.meta.env)
+  const vercelKey = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  // 2. Intentar obtener de AI Studio (inyectado en window.process)
+  const studioKey = (window as any).process?.env?.GEMINI_API_KEY || (window as any).process?.env?.API_KEY;
+  
+  const apiKey = vercelKey || studioKey;
+    
+  if (!apiKey || apiKey === "") {
+    throw new Error("Falta la API Key de Gemini. Debes configurar VITE_GEMINI_API_KEY en .env.local (desarrollo) o en Vercel (producción).");
+  }
+  
+  return new GoogleGenAI({ apiKey: apiKey as string });
+};
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, delay = 2000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      const is503 = error?.message?.includes('503') || error?.status === 503 || JSON.stringify(error).includes('503');
+      const isOverloaded = error?.message?.includes('high demand') || error?.message?.includes('overloaded');
+      
+      if (is503 || isOverloaded) {
+        console.warn(`Gemini API sobrecargada (intento ${i + 1}/${maxRetries}). Reintentando en ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponencial backoff
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
+export async function getDraftMessage(type: 'bienvenida' | 'alerta' | 'felicitacion', studentName: string): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Escribe un mensaje de WhatsApp corto y profesional para un padre de familia. 
+      Tipo: ${type}. Alumno: ${studentName}. Gimnasio: GymCoach Pro.
+      Tono: Empático, motivador y profesional. Máximo 60 palabras.`,
+    });
+    return response.text || "";
+  }).catch(error => {
+    console.error("Error en getDraftMessage:", error);
+    return "Error al generar mensaje.";
+  });
+}
+
+export async function processClassAudio(audioBase64: string, mimeType: string): Promise<any> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: audioBase64,
+              mimeType: mimeType,
+            },
+          },
+          {
+            text: `Analiza este audio de un entrenador de gimnasia reportando su clase. 
+            Extrae la información y devuélvela estrictamente en formato JSON.
+            
+            REGLAS DE CONSISTENCIA:
+            1. Si el entrenador menciona una habilidad (ej. "Mortal atrás"), asegúrate de que el aparato coincida (ej. "Suelo"). Si no coincide o es ambiguo, márcalo.
+            2. Si el audio tiene mucho ruido o es ininteligible en partes clave, marca 'clarificationNeeded' como true.
+            3. Si faltan datos obligatorios (entrenador, grupo o al menos un aparato), marca 'clarificationNeeded' como true.
+            
+            Formato esperado:
+            {
+              "warmup": ["item1", "item2"],
+              "apparatusUsed": ["Suelo", "Viga", etc],
+              "skillsCovered": ["habilidad1", "habilidad2"],
+              "entrenador": "nombre detectado o null",
+              "grupo": "nivel detectado o null",
+              "confidence": number (0-100),
+              "clarificationNeeded": boolean,
+              "question": "texto de la pregunta específica para el usuario si algo no está claro",
+              "inconsistencies": ["lista de dudas o contradicciones detectadas"]
+            }
+            
+            Aparatos válidos: Suelo, Viga, Paralelas, Salto, Anillas, Arzones, Barra Fija.`,
+          },
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+    
+    return JSON.parse(response.text || "{}");
+  });
+}
+
+export async function refineClassAnalysis(previousData: any, userClarification: string): Promise<any> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `El entrenador proporcionó esta información previa de la clase: ${JSON.stringify(previousData)}.
+      Ante la duda de la IA, el entrenador aclara: "${userClarification}".
+      Actualiza los datos y devuelve el JSON final sin necesidad de más aclaraciones.`,
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+    return JSON.parse(response.text || "{}");
+  });
+}
+
+export async function analyzeChurnRisk(data: any): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analiza estos datos de asistencia y pagos: ${JSON.stringify(data)}. 
+      Identifica alumnos en riesgo de abandonar el gimnasio y sugiere acciones de retención.`,
+    });
+    return response.text || "Análisis no disponible.";
+  }).catch(error => {
+    console.error("Error en analyzeChurnRisk:", error);
+    return "Error en el análisis de retención.";
+  });
+}
+
+export async function getSearchGroundedAnswer(query: string): Promise<{ text: string, sources: any[] }> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Eres un experto entrenador de gimnasia artística. Responde a la siguiente consulta sobre ejercitaciones, metodologías o enseñanza: "${query}". Usa información actualizada de la web.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+    
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const sources = chunks.map((chunk: any) => chunk.web).filter(Boolean);
+    
+    return {
+      text: response.text || "No se encontró información.",
+      sources
+    };
+  }).catch(error => {
+    console.error("Error en getSearchGroundedAnswer:", error);
+    return { text: `Error al realizar la búsqueda: ${error.message || error}`, sources: [] };
+  });
+}
+
+export async function analyzeAttendanceStats(stats: any): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Analiza estas estadísticas de asistencia y matrícula del gimnasio: ${JSON.stringify(stats)}. 
+      Proporciona un resumen ejecutivo, identifica tendencias (positivas o negativas) y sugiere 3 acciones concretas para mejorar la retención o el crecimiento. 
+      Responde en español, con un tono profesional y directo. Usa markdown para el formato.`,
+    });
+    return response.text || "Análisis no disponible.";
+  }).catch(error => {
+    console.error("Error en analyzeAttendanceStats:", error);
+    return "Error al analizar las estadísticas.";
+  });
+}
+
+export async function queryKnowledgeBase(query: string, sources: any[]): Promise<string> {
+  return withRetry(async () => {
+    const ai = getAI();
+    const parts: any[] = [
+      { text: `Eres un asistente experto en gimnasia artística. Tu tarea es responder a la consulta del usuario basándote EXCLUSIVAMENTE en los documentos proporcionados. 
+      
+      REGLAS CRÍTICAS:
+      1. Responde ÚNICAMENTE usando la información de los documentos adjuntos.
+      2. Si la información necesaria para responder no se encuentra en los documentos, responde exactamente: "Lo siento, no encuentro esa información en los documentos proporcionados."
+      3. NO utilices tu conocimiento general previo.
+      4. NO inventes ni alucines información.
+      5. Cita el nombre del documento si es posible.
+      
+      Consulta: "${query}"` }
+    ];
+
+    for (const source of sources) {
+      if (source.type === 'pdf') {
+        parts.push({
+          inlineData: {
+            data: source.content,
+            mimeType: 'application/pdf'
+          }
+        });
+      } else {
+        // Para texto, docx (ahora extraído a texto) o doc
+        // Enviamos como texto para evitar errores de MIME type no soportado en inlineData
+        parts.push({ text: `Documento: ${source.name}\nContenido: ${source.content}` });
+      }
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-flash-latest", // Cambiado a flash-latest para intentar evitar la saturación de gemini-3-flash-preview
+      contents: { parts },
+    });
+    
+    return response.text || "No se pudo generar una respuesta.";
+  }).catch(error => {
+    console.error("Error en queryKnowledgeBase:", error);
+    return `Error al consultar la base de conocimientos: ${error.message || error}`;
+  });
+}

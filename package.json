@@ -1,0 +1,52 @@
+{
+  "name": "gymcoach-pro-elite",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build",
+    "start": "node dist/server.js",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "axios": "^1.15.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "firebase": "^12.9.0",
+    "framer-motion": "^12.36.0",
+    "google-spreadsheet": "^5.2.0",
+    "googleapis": "^171.4.0",
+    "lucide-react": "latest",
+    "mammoth": "^1.12.0",
+    "motion": "^12.36.0",
+    "papaparse": "^5.5.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-is": "^19.2.6",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@types/express": "^5.0.6",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "latest",
+    "@vitest/ui": "^1.1.0",
+    "eslint": "^10.2.1",
+    "jsdom": "^23.0.1",
+    "tsx": "^4.21.0",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "^1.1.0"
+  }
+}
