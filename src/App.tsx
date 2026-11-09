@@ -3,6 +3,7 @@ import {
   AppUser,
   AlumnoRecord,
   PagoGimnasiaRecord,
+  AlertaPagoRecord,
   AsistenciaRecord,
   ProfesorGimnasiaRecord,
   AsignacionGimnasiaRecord,
@@ -15,6 +16,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import {
   subscribeAlumnos,
   subscribePagos,
+  subscribeAlertasPagos,
   subscribeAsistencias,
   subscribeProfesores,
   subscribeAsignaciones,
@@ -26,6 +28,7 @@ import {
   updateAlumnoMedicalStatus,
   addProfesor,
   removeProfesor,
+  ExcelImportResult,
 } from './services/firestoreService';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -49,6 +52,7 @@ export default function App() {
   const [asistencias, setAsistencias] = useState<AsistenciaRecord[]>([]);
   const [profesores, setProfesores] = useState<ProfesorGimnasiaRecord[]>([]);
   const [asignaciones, setAsignaciones] = useState<AsignacionGimnasiaRecord[]>([]);
+  const [alertas, setAlertas] = useState<AlertaPagoRecord[]>([]);
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -120,6 +124,7 @@ export default function App() {
       );
     }
 
+    const unsubAlertas = subscribeAlertasPagos((data) => setAlertas(data));
     const unsubAsistencias = subscribeAsistencias((data) => setAsistencias(data));
     const unsubProfesores = subscribeProfesores((data) => setProfesores(data));
     const unsubAsignaciones = subscribeAsignaciones((data) => setAsignaciones(data));
@@ -127,6 +132,7 @@ export default function App() {
     return () => {
       unsubAlumnos();
       unsubPagos();
+      unsubAlertas();
       unsubAsistencias();
       unsubProfesores();
       unsubAsignaciones();
@@ -275,13 +281,22 @@ export default function App() {
     setActiveTab('rutinas');
   };
 
+  const handleExcelImportCompleted = (result: ExcelImportResult) => {
+    if (result.newPayments.length > 0) {
+      setPagos((prev) => [...result.newPayments, ...prev]);
+    }
+    if (result.newAlerts.length > 0) {
+      setAlertas((prev) => [...result.newAlerts, ...prev]);
+    }
+  };
+
   // If not logged in, show Login Screen
   if (!currentUser) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Safety: If professor tries to access dashboard or pagos, redirect to gimnastas
-  if (!isCoordinador && (activeTab === 'dashboard' || activeTab === 'pagos')) {
+  // Safety: If professor tries to access pagos, redirect to gimnastas
+  if (!isCoordinador && activeTab === 'pagos') {
     setActiveTab('gimnastas');
   }
 
@@ -300,12 +315,13 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {/* Coordinador only: Dashboard with revenue */}
-        {activeTab === 'dashboard' && isCoordinador && (
+        {/* Inicio: visible for both roles (Coordinador sees revenue + alerts, Profesor sees athletic KPIs + alerts, NO revenue) */}
+        {activeTab === 'dashboard' && (
           <DashboardView
             currentUser={currentUser}
             gymnasts={alumnos}
             payments={pagos}
+            paymentAlerts={alertas}
             onNavigate={(tab) => setActiveTab(tab)}
             onOpenPaymentModal={() => {
               setPaymentModalDoc(undefined);
@@ -317,7 +333,7 @@ export default function App() {
           />
         )}
 
-        {/* Coordinador only: Control de Pagos with 6 tabs & JSON loader */}
+        {/* Coordinador only: Control de Pagos with 7 tabs, Excel SheetJS & JSON loader */}
         {activeTab === 'pagos' && isCoordinador && (
           <PaymentsView
             payments={pagos}
@@ -333,13 +349,15 @@ export default function App() {
             onImportJSON={handleImportBatchJSON}
             onAddProfesor={handleAddProfesor}
             onRemoveProfesor={handleRemoveProfesor}
+            onExcelImportCompleted={handleExcelImportCompleted}
           />
         )}
 
-        {/* Both roles: Atletas */}
+        {/* Both roles: Atletas con Panel de Pagos Recientes */}
         {activeTab === 'gimnastas' && (
           <GymnastsView
             gymnasts={alumnos}
+            paymentAlerts={alertas}
             onSelectGymnast={(g) => setSelectedGymnastForDetail(g)}
             onOpenNewGymnastModal={() => setIsNewGymnastModalOpen(true)}
             onOpenScorer={handleOpenScorer}
