@@ -13,6 +13,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
   AlumnoRecord,
   PagoGimnasiaRecord,
+  AlertaPagoRecord,
   AsistenciaRecord,
   ProfesorGimnasiaRecord,
   AsignacionGimnasiaRecord,
@@ -22,6 +23,7 @@ import {
 export const COLLECTIONS = {
   ALUMNOS: 'alumnos',
   PAGOS: 'pagosGimnasia',
+  ALERTAS: 'alertasPagos',
   ASISTENCIAS: 'asistencias',
   PROFESORES: 'profesoresGimnasia',
   ASIGNACIONES: 'asignacionesGimnasia',
@@ -286,4 +288,193 @@ export const subscribeAsignaciones = (
       if (onError) onError(error);
     }
   );
+};
+
+// --- ALERTAS DE PAGOS ---
+export const subscribeAlertasPagos = (
+  onSuccess: (data: AlertaPagoRecord[]) => void,
+  onError?: (err: unknown) => void
+) => {
+  const colRef = collection(db, COLLECTIONS.ALERTAS);
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const items: AlertaPagoRecord[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        items.push({
+          id: d.id,
+          apellido_nombre: data.apellido_nombre || '',
+          mes: data.mes || '',
+          documento: data.documento || '',
+          createdAt: data.createdAt || '',
+        });
+      });
+      // Sort newest first
+      items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      onSuccess(items);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.GET, COLLECTIONS.ALERTAS);
+      if (onError) onError(error);
+    }
+  );
+};
+
+// Helper to format dates from Excel
+export function formatExcelDate(val: any): string {
+  if (!val) return new Date().toISOString().split('T')[0];
+  if (val instanceof Date) {
+    return val.toISOString().split('T')[0];
+  }
+  if (typeof val === 'number') {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const jsDate = new Date(excelEpoch.getTime() + val * 86400000);
+    return jsDate.toISOString().split('T')[0];
+  }
+  const str = String(val).trim();
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+    const [d, m, y] = str.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return str;
+}
+
+export interface ExcelImportResult {
+  totalRows: number;
+  filteredCount: number;
+  newImportedCount: number;
+  duplicateCount: number;
+  newPayments: PagoGimnasiaRecord[];
+  newAlerts: AlertaPagoRecord[];
+}
+
+export const importExcelPagosFromSheet = async (
+  rawRows: any[][],
+  existingPaymentsMap?: Map<string, PagoGimnasiaRecord>
+): Promise<ExcelImportResult> => {
+  // Use data from row 3 (0-indexed index 2)
+  const rows = rawRows.slice(2);
+  const totalRows = rows.length;
+
+  const normalizeStr = (s: any) =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+  const newPayments: PagoGimnasiaRecord[] = [];
+  const newAlerts: AlertaPagoRecord[] = [];
+  let filteredCount = 0;
+  let duplicateCount = 0;
+
+  for (const row of rows) {
+    if (!row || row.length === 0) continue;
+
+    // Column A (idx 0): Apellido y Nombre
+    const apellidoNombre = String(row[0] || '').trim();
+    // Column B (idx 1): Trámite (texto con código entre corchetes, ej [003-011-005])
+    const tramite = String(row[1] || '').trim();
+    // Column C (idx 2): Último pago (fecha)
+    const fechaPagoRaw = row[2];
+    // Column D (idx 3): DNI (texto)
+    const dni = String(row[3] || '').trim();
+    // Column E (idx 4): Monto
+    const montoRaw = row[4];
+    // Column F (idx 5): Cuotas
+    const cuotas = row[5] !== undefined ? String(row[5]).trim() : '1';
+    // Column G (idx 6): Observaciones
+    const observacion = row[6] !== undefined ? String(row[6]).trim() : '';
+    // Column H (idx 7): Mes (ej. '03 - marzo')
+    const mes = String(row[7] || '').trim();
+
+    // Filtrar SOLO trámites que empiecen con 'Gimnasia Artística Infantil'
+    const cleanTramite = normalizeStr(tramite);
+    if (!cleanTramite.startsWith('gimnasia artistica infantil')) {
+      continue;
+    }
+    filteredCount++;
+
+    // Extraer código entre corchetes ej. [003-011-005]
+    const codeMatch = tramite.match(/\[(.*?)\]/);
+    const codigo = codeMatch ? codeMatch[1].trim() : 'GIM-ART';
+
+    // id = codigo_dni_mes (sanitizamos barras '/' que invalidarían paths de Firestore)
+    const sanitizeId = (str: string) => str.replace(/[\/\\]/g, '-').replace(/\s+/g, '_').trim();
+    const docId = `${sanitizeId(codigo)}_${sanitizeId(dni)}_${sanitizeId(mes)}`;
+
+    // Verificar si ya existe en pagosGimnasia
+    let alreadyExists = false;
+    if (existingPaymentsMap && existingPaymentsMap.has(docId)) {
+      alreadyExists = true;
+    } else {
+      try {
+        const docRef = doc(db, COLLECTIONS.PAGOS, docId);
+        const snap = await getDoc(docRef);
+        alreadyExists = snap.exists();
+      } catch (err) {
+        console.warn('Error verificando documento existente:', err);
+      }
+    }
+
+    if (alreadyExists) {
+      duplicateCount++;
+      continue;
+    }
+
+    // Parsear fecha y monto
+    const fecha_pago = formatExcelDate(fechaPagoRaw);
+    const importe = typeof montoRaw === 'number'
+      ? montoRaw
+      : parseFloat(String(montoRaw || '0').replace(/[^0-9.-]+/g, '')) || 0;
+
+    const mesNumMatch = mes.match(/\d+/);
+    const mes_numero = mesNumMatch ? parseInt(mesNumMatch[0], 10) : 3;
+
+    // Guardar en pagosGimnasia (documento, apellido_nombre, importe, cuotas, observacion, mes, fecha_pago, codigo, tramite)
+    const pagoRecord: PagoGimnasiaRecord = {
+      id: docId,
+      documento: dni,
+      apellido_nombre: apellidoNombre,
+      importe,
+      cuotas,
+      observacion,
+      mes,
+      mes_numero,
+      fecha_pago,
+      codigo,
+      tramite,
+      estado: 'pagado',
+    };
+
+    try {
+      // 1) Guardar en pagosGimnasia
+      const pagoDocRef = doc(db, COLLECTIONS.PAGOS, docId);
+      await setDoc(pagoDocRef, pagoRecord, { merge: true });
+      newPayments.push(pagoRecord);
+
+      // 2) Crear alerta en alertasPagos con apellido_nombre, mes y documento (DNI), sin montos ni observaciones
+      const alertaPayload = {
+        apellido_nombre: apellidoNombre,
+        mes,
+        documento: dni,
+        createdAt: new Date().toISOString(),
+      };
+      const alertaDoc = await addDoc(collection(db, COLLECTIONS.ALERTAS), alertaPayload);
+      newAlerts.push({ id: alertaDoc.id, ...alertaPayload });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, COLLECTIONS.PAGOS);
+      throw err;
+    }
+  }
+
+  return {
+    totalRows,
+    filteredCount,
+    newImportedCount: newPayments.length,
+    duplicateCount,
+    newPayments,
+    newAlerts,
+  };
 };
