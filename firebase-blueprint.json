@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "Alumno": {
+      "title": "Alumno",
+      "description": "Ficha de atleta de gimnasia artística",
+      "type": "object",
+      "properties": {
+        "documento": { "type": "string" },
+        "apellido_nombre": { "type": "string" },
+        "nivel": { "type": "string" },
+        "rango_etario": { "type": "string" },
+        "horario_completo": { "type": "string" },
+        "dias_semana": { "type": "string" },
+        "estado_medico": { "type": "string" },
+        "contacto_tutor": { "type": "string" },
+        "telefono_tutor": { "type": "string" },
+        "asistencia_porcentaje": { "type": "number" },
+        "aparato_favorito": { "type": "string" },
+        "scores": { "type": "object" },
+        "score_history": { "type": "array" }
+      },
+      "required": ["documento", "apellido_nombre"]
+    },
+    "PagoGimnasia": {
+      "title": "PagoGimnasia",
+      "description": "Registro de pago de cuota o arancel de gimnasia",
+      "type": "object",
+      "properties": {
+        "documento": { "type": "string" },
+        "apellido_nombre": { "type": "string" },
+        "importe": { "type": "number" },
+        "mes": { "type": "string" },
+        "mes_numero": { "type": "number" },
+        "fecha_pago": { "type": "string" },
+        "matricula": { "type": "number" },
+        "codigo": { "type": "string" },
+        "rango_etario": { "type": "string" },
+        "horario_completo": { "type": "string" },
+        "dias_semana": { "type": "string" }
+      },
+      "required": ["documento", "apellido_nombre", "mes_numero"]
+    },
+    "Asistencia": {
+      "title": "Asistencia",
+      "description": "Registro diario de pase de lista por clase y grupo",
+      "type": "object",
+      "properties": {
+        "fecha": { "type": "string" },
+        "grupo": { "type": "string" },
+        "horario": { "type": "string" },
+        "profesorEmail": { "type": "string" },
+        "registros": { "type": "object" },
+        "presentes": { "type": "number" },
+        "ausentes": { "type": "number" },
+        "tardes": { "type": "number" },
+        "justificados": { "type": "number" }
+      },
+      "required": ["fecha", "grupo"]
+    },
+    "ProfesorGimnasia": {
+      "title": "ProfesorGimnasia",
+      "description": "Docente o entrenador de la escuela",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "email": { "type": "string" },
+        "telefono": { "type": "string" },
+        "rol": { "type": "string" },
+        "especialidad": { "type": "string" }
+      },
+      "required": ["nombre", "email"]
+    },
+    "AsignacionGimnasia": {
+      "title": "AsignacionGimnasia",
+      "description": "Asignación de grupo y horario a docente",
+      "type": "object",
+      "properties": {
+        "profesorEmail": { "type": "string" },
+        "grupo": { "type": "string" },
+        "horario_completo": { "type": "string" },
+        "dias_semana": { "type": "string" },
+        "rango_etario": { "type": "string" }
+      },
+      "required": ["profesorEmail", "grupo"]
+    }
+  },
+  "firestore": {
+    "/alumnos/{alumnoId}": {
+      "schema": "Alumno",
+      "description": "Colección de gimnastas y fichas técnicas"
+    },
+    "/pagosGimnasia/{pagoId}": {
+      "schema": "PagoGimnasia",
+      "description": "Colección de registros de cuotas y aranceles"
+    },
+    "/asistencias/{asistenciaId}": {
+      "schema": "Asistencia",
+      "description": "Colección de pases de lista diarios"
+    },
+    "/profesoresGimnasia/{profesorId}": {
+      "schema": "ProfesorGimnasia",
+      "description": "Colección del equipo docente"
+    },
+    "/asignacionesGimnasia/{asignacionId}": {
+      "schema": "AsignacionGimnasia",
+      "description": "Colección de asignaciones de grupos a profesores"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "GymCoach Pro Elite",
+  "description": "Sistema de gestión y control integral para escuelas de gimnasia artística: control de pagos, seguimiento por aparatos, atletas y planificación de entrenamientos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
