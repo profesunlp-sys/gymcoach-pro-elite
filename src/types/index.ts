@@ -59,6 +59,14 @@ export interface AlumnoRecord {
   fecha_ingreso?: string;
 }
 
+export interface AlertaPagoRecord {
+  id: string;
+  apellido_nombre: string;
+  mes: string;
+  documento: string; // DNI
+  createdAt?: string;
+}
+
 export interface PagoGimnasiaRecord {
   id: string;
   documento: string;
@@ -67,14 +75,17 @@ export interface PagoGimnasiaRecord {
   mes: string;
   mes_numero: number; // 3 (Marzo) to 11 (Noviembre)
   fecha_pago: string;
-  matricula: number;
+  matricula?: number;
   codigo: string;
-  rango_etario: string;
-  horario_completo: string;
-  dias_semana: string;
+  rango_etario?: string;
+  horario_completo?: string;
+  dias_semana?: string;
   estado?: 'pagado' | 'pendiente' | 'vencido' | 'beca';
   medio_pago?: string;
   nro_recibo?: string;
+  cuotas?: number | string;
+  observacion?: string;
+  tramite?: string;
 }
 
 export interface AsistenciaRecord {
