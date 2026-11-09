@@ -1,6 +1,7 @@
 import React from 'react';
-import { AlumnoRecord, PagoGimnasiaRecord, AppUser, ApparatusType } from '../types';
+import { AlumnoRecord, PagoGimnasiaRecord, AlertaPagoRecord, AppUser, ApparatusType } from '../types';
 import { ApparatusIcon } from './GymnastIcon';
+import { RecentPaymentAlertsPanel } from './RecentPaymentAlertsPanel';
 import {
   Users,
   CreditCard,
@@ -20,6 +21,7 @@ interface DashboardViewProps {
   currentUser: AppUser;
   gymnasts: AlumnoRecord[];
   payments: PagoGimnasiaRecord[];
+  paymentAlerts?: AlertaPagoRecord[];
   onNavigate: (tab: string) => void;
   onOpenPaymentModal: () => void;
   onOpenGymnastModal: () => void;
@@ -31,6 +33,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   gymnasts,
   payments,
+  paymentAlerts = [],
   onNavigate,
   onOpenPaymentModal,
   onOpenGymnastModal,
@@ -38,6 +41,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectGymnast,
 }) => {
   const isCoordinador = currentUser.role === 'coordinador';
+
+  const handleSelectByDni = (dni: string) => {
+    const cleanDni = dni.replace(/\D/g, '');
+    const found = gymnasts.find(
+      (g) => g.documento.replace(/\D/g, '') === cleanDni || g.documento.trim() === dni.trim()
+    );
+    if (found) {
+      onSelectGymnast(found);
+    }
+  };
 
   // Financial stats
   const currentMonthPayments = payments.filter((p) => p.mes === 'Noviembre' || p.mes_numero === 11);
@@ -316,8 +329,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Horarios y acceso a Pagos si es coordinador */}
+        {/* Right Column: Pagos Recientes (Staff & Coord), Control de Cobranzas (Coord), Turnos */}
         <div className="space-y-4">
+          {/* Panel Pagos Recientes (Visible para todos los roles: coordinador y profesor) */}
+          <RecentPaymentAlertsPanel
+            alerts={paymentAlerts}
+            alumnos={gymnasts}
+            onSelectGymnastByDni={handleSelectByDni}
+          />
+
           {isCoordinador && (
             <div className="p-5 rounded-2xl bg-[#131b2e] border border-[#222a3d]">
               <div className="flex items-center justify-between mb-4">

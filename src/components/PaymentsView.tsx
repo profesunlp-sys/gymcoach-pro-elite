@@ -24,6 +24,7 @@ import {
   Mail,
   Phone,
   Shield,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,6 +35,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
+import { ExcelImportPaymentsTab } from './ExcelImportPaymentsTab';
 
 interface PaymentsViewProps {
   payments: PagoGimnasiaRecord[];
@@ -46,9 +48,10 @@ interface PaymentsViewProps {
   onImportJSON: (data: Omit<PagoGimnasiaRecord, 'id'>[]) => Promise<void>;
   onAddProfesor: (email: string, nombre: string, extra?: Partial<ProfesorGimnasiaRecord>) => Promise<void>;
   onRemoveProfesor: (email: string) => Promise<void>;
+  onExcelImportCompleted?: (result: any) => void;
 }
 
-type PaymentTab = 'resumen' | 'alumnos' | 'grupos' | 'profesores' | 'informes' | 'matriz';
+type PaymentTab = 'resumen' | 'alumnos' | 'grupos' | 'profesores' | 'informes' | 'matriz' | 'importar';
 
 const MONTH_NAMES: { [key: number]: string } = {
   3: 'Marzo',
@@ -75,6 +78,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   onImportJSON,
   onAddProfesor,
   onRemoveProfesor,
+  onExcelImportCompleted,
 }) => {
   const [activeTab, setActiveTab] = useState<PaymentTab>('resumen');
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,9 +180,9 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
         studentMap.set(key, {
           documento: p.documento,
           apellido_nombre: p.apellido_nombre,
-          rango_etario: p.rango_etario,
-          horario_completo: p.horario_completo,
-          dias_semana: p.dias_semana,
+          rango_etario: p.rango_etario || '9 a 12 años',
+          horario_completo: p.horario_completo || '17:00 a 18:30',
+          dias_semana: p.dias_semana || 'Lun y Mié',
           months: {},
           totalAdeudado: 0,
           totalAbonado: 0,
@@ -322,6 +326,14 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              onClick={() => setActiveTab('importar')}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#001f26] bg-[#4cd7f6] hover:bg-[#3ac0de] rounded-xl transition-all shadow-[0_0_12px_rgba(76,215,246,0.3)]"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Importar Excel (.xlsx)</span>
+            </button>
+
+            <button
               onClick={() => setShowImportModal(true)}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#dae2fd] bg-[#171f33] hover:bg-[#222a3d] border border-[#222a3d] rounded-xl transition-all"
             >
@@ -339,7 +351,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
 
             <button
               onClick={() => onOpenPaymentModal()}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-[#001f26] bg-[#4cd7f6] hover:bg-[#3ac0de] rounded-xl transition-all shadow-[0_0_15px_rgba(76,215,246,0.3)]"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[#1e40af] hover:bg-[#2563eb] rounded-xl transition-all border border-white/10"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Nuevo Cobro</span>
@@ -347,11 +359,12 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
           </div>
         </div>
 
-        {/* 6 Tabs requested: Resumen, Alumnos, Grupos, Profesores, Informes, Estado de pagos */}
+        {/* Tabs: Resumen, Importar Excel, Alumnos, Grupos, Profesores, Informes, Estado de pagos */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 pt-1 border-t border-[#222a3d]">
           {[
             { id: 'resumen', label: 'Resumen', icon: BarChart2 },
             { id: 'matriz', label: 'Estado de Pagos (Mar-Nov)', icon: Grid3X3 },
+            { id: 'importar', label: 'Importar Excel', icon: FileSpreadsheet },
             { id: 'alumnos', label: 'Alumnos', icon: Users },
             { id: 'grupos', label: 'Grupos', icon: Clock },
             { id: 'profesores', label: 'Profesores', icon: UserCheck },
@@ -770,6 +783,14 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* TAB 7: IMPORTAR EXCEL (.XLSX SHEETJS) */}
+      {activeTab === 'importar' && (
+        <ExcelImportPaymentsTab
+          existingPayments={payments}
+          onImportCompleted={onExcelImportCompleted}
+        />
       )}
 
       {/* MODAL: AGREGAR PROFESOR (SOLO COORDINADOR) */}

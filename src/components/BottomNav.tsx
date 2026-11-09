@@ -23,12 +23,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         { id: 'asistencia', label: 'Pase Lista', icon: CalendarCheck },
       ]
     : [
+        { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
         { id: 'gimnastas', label: 'Atletas', icon: Users },
         { id: 'rutinas', label: 'Aparatos', icon: Target },
         { id: 'asistencia', label: 'Pase Lista', icon: CalendarCheck },
       ];
 
-  const colsClass = isCoordinador ? 'grid-cols-5' : 'grid-cols-3';
+  const colsClass = isCoordinador ? 'grid-cols-5' : 'grid-cols-4';
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0b1326]/95 backdrop-blur-lg border-t border-[#222a3d] pb-[safe-area-inset-bottom] font-['Plus_Jakarta_Sans',sans-serif]">

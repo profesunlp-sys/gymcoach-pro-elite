@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { AlumnoRecord, MedicalStatus, ApparatusType } from '../types';
+import { AlumnoRecord, MedicalStatus, ApparatusType, AlertaPagoRecord } from '../types';
 import { ApparatusIcon } from './GymnastIcon';
+import { RecentPaymentAlertsPanel } from './RecentPaymentAlertsPanel';
 import {
   Users,
   Search,
@@ -15,6 +16,7 @@ import {
 
 interface GymnastsViewProps {
   gymnasts: AlumnoRecord[];
+  paymentAlerts?: AlertaPagoRecord[];
   onSelectGymnast: (gymnast: AlumnoRecord) => void;
   onOpenNewGymnastModal: () => void;
   onOpenScorer: (gymnastId: string, apparatus?: ApparatusType) => void;
@@ -22,6 +24,7 @@ interface GymnastsViewProps {
 
 export const GymnastsView: React.FC<GymnastsViewProps> = ({
   gymnasts,
+  paymentAlerts = [],
   onSelectGymnast,
   onOpenNewGymnastModal,
   onOpenScorer,
@@ -74,6 +77,16 @@ export const GymnastsView: React.FC<GymnastsViewProps> = ({
     }
   };
 
+  const handleSelectByDni = (dni: string) => {
+    const cleanDni = dni.replace(/\D/g, '');
+    const found = gymnasts.find(
+      (g) => g.documento.replace(/\D/g, '') === cleanDni || g.documento.trim() === dni.trim()
+    );
+    if (found) {
+      onSelectGymnast(found);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 md:pb-8 animate-fade-in font-['Plus_Jakarta_Sans',sans-serif]">
       {/* View Header */}
@@ -100,6 +113,13 @@ export const GymnastsView: React.FC<GymnastsViewProps> = ({
           <span>Inscribir Gimnasta</span>
         </button>
       </div>
+
+      {/* Panel Pagos Recientes (Visible para todos los roles: coordinador y profesor) */}
+      <RecentPaymentAlertsPanel
+        alerts={paymentAlerts}
+        alumnos={gymnasts}
+        onSelectGymnastByDni={handleSelectByDni}
+      />
 
       {/* Filter and Search Bar */}
       <div className="p-4 rounded-2xl bg-[#131b2e] border border-[#222a3d] space-y-3">

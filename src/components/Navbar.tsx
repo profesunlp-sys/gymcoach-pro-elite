@@ -42,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         { id: 'asistencia', label: 'Pase de Lista', icon: CalendarCheck },
       ]
     : [
+        { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
         { id: 'gimnastas', label: 'Atletas', icon: Users },
         { id: 'rutinas', label: 'Aparatos FIG', icon: Target },
         { id: 'asistencia', label: 'Pase de Lista', icon: CalendarCheck },
