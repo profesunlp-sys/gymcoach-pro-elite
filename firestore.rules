@@ -33,6 +33,12 @@ service cloud.firestore {
       allow read, write: if isCoordinator();
     }
 
+    // Alertas Pagos: read isStaff(), write only isCoordinator()
+    match /alertasPagos/{alertaId} {
+      allow read: if isStaff();
+      allow write: if isCoordinator();
+    }
+
     // Asistencias: read and write only isStaff()
     match /asistencias/{asistenciaId} {
       allow read, write: if isStaff();

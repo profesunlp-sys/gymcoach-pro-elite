@@ -82,6 +82,18 @@
         "rango_etario": { "type": "string" }
       },
       "required": ["profesorEmail", "grupo"]
+    },
+    "AlertaPago": {
+      "title": "AlertaPago",
+      "description": "Notificación resumida de pago reciente para cuerpo técnico sin datos financieros sensibles",
+      "type": "object",
+      "properties": {
+        "apellido_nombre": { "type": "string" },
+        "mes": { "type": "string" },
+        "documento": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["apellido_nombre", "mes", "documento"]
     }
   },
   "firestore": {
@@ -92,6 +104,10 @@
     "/pagosGimnasia/{pagoId}": {
       "schema": "PagoGimnasia",
       "description": "Colección de registros de cuotas y aranceles"
+    },
+    "/alertasPagos/{alertaId}": {
+      "schema": "AlertaPago",
+      "description": "Colección de alertas de pagos recientes visible para todo el staff"
     },
     "/asistencias/{asistenciaId}": {
       "schema": "Asistencia",
