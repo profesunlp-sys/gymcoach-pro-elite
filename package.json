@@ -34,8 +34,6 @@
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
-    "@testing-library/jest-dom": "^6.1.5",
-    "@testing-library/react": "^14.1.2",
     "@types/express": "^5.0.6",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.0",
